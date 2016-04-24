@@ -16,7 +16,6 @@ import android.view.MenuItem;
 
 import com.google.gson.Gson;
 
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -39,23 +38,14 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-//        sendTweetRequest("#MakeDonaldDrumpfagain");// This is for Twitter. It includes a POST and a GET example.
 
         new Thread(new Runnable() {
             @Override
             public void run() {
-                // I need to sign up to Twitter and get an API key and secret from their developer console.
-                // Then I need to pass it as base64("Consumer Key"+":"+"Consumer Secret")
                 String authorizationHeader = getAuthorizationHeader("FOQIQnJENhEgjYXYaGSIhhSaA", "9B2nTfoFFPeysRhegLm9Yra4r5psBBOAPMqOtqq7T2U27Cxqwr");
 
-                // I open an HTTPS connection and POST it to get an OAuth 2 bearer token from them required to actually *use* their API.
                 String bearerToken = postOAuth2Token(authorizationHeader);
 
-                // With the bearer token, I am able to make any "application authentication" call to their API. This is as opposed to "user context"
-                // authentication, which I would require to do anything *as* an actual user. For example, I would need user context authentication
-                // to make a Tweet via a "POST statuses/update" call.
-
-                // Let's use GET search/tweets to see if anyone has tweeted about "cats"
                 String jsonTweets = getSearchTweets(bearerToken, "#MakeDonaldDrumpfagain");
                 System.out.println(jsonTweets);
             }
@@ -76,23 +66,19 @@ public class MainActivity extends AppCompatActivity {
             connection = (HttpURLConnection)url.openConnection();
             connection.setRequestMethod("POST");
 
-            // Form the body of the request
             String body = "grant_type=client_credentials";
 
-            // Set required headers.
             connection.setRequestProperty("User-Agent", "Artblot");
             connection.setRequestProperty("Authorization", "Basic " + authorizationHeader);
             connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
             connection.setRequestProperty("Content-Length", Integer.toString(body.getBytes().length));
 
-            // Set parameters required in the body of the POST request.
             connection.setDoOutput(true);
             DataOutputStream wr = new DataOutputStream(connection.getOutputStream());
             wr.writeBytes(body);
             wr.flush();
             wr.close();
 
-            // Send the request.
             int responseCode = connection.getResponseCode();
             if(responseCode == HttpURLConnection.HTTP_OK)
             {
@@ -106,10 +92,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 in.close();
 
-                // This is the JSON string coming back. You would pass this into some kind of a JSON parser,
-                // which would do something nicer.
                 bearerToken = response.toString();
-                // For this example, I'm not really parsing the JSON correctly. I'm just getting the access token out using raw string methods.
                 bearerToken = bearerToken.substring(bearerToken.indexOf("\"access_token\":\"")+"\"access_token\":\"".length(), bearerToken.lastIndexOf("\"}"));
             }
             else {
@@ -137,7 +120,6 @@ public class MainActivity extends AppCompatActivity {
             connection = (HttpURLConnection)url.openConnection();
             connection.setRequestMethod("GET");
 
-            // Set required headers.
             connection.setRequestProperty("Authorization", "Bearer " + bearerToken);
 
             int responseCode = connection.getResponseCode();
