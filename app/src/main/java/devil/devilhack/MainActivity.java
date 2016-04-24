@@ -3,6 +3,7 @@ package devil.devilhack;
 import android.app.SearchManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.view.MenuItemCompat;
@@ -13,7 +14,11 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.gson.Gson;
 
@@ -29,6 +34,9 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -36,23 +44,18 @@ public class MainActivity extends AppCompatActivity {
     String url = "https://api.havenondemand.com/1/api/sync/analyzesentiment/v1";
     Double finalScore = 0d;
     TextView textView;
+    private String bearerToken = null;
+    ProgressBar progressBar;
+    private List<Thread> threads = new ArrayList<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        textView=(TextView)findViewById(R.id.tv) ;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                String authorizationHeader = getAuthorizationHeader("FOQIQnJENhEgjYXYaGSIhhSaA", "9B2nTfoFFPeysRhegLm9Yra4r5psBBOAPMqOtqq7T2U27Cxqwr");
+        progressBar = (ProgressBar) findViewById(R.id.progressBar);
 
-                String bearerToken = postOAuth2Token(authorizationHeader);
-
-                String jsonTweets = getSearchTweets(bearerToken, "#MakeDonaldDrumpfagain");
-                System.out.println(jsonTweets);
-            }
-        }).start();
+        textView=(TextView)findViewById(R.id.textView) ;
     }
 
     public static String getAuthorizationHeader(String consumerKey, String consumerSecret) {
@@ -114,56 +117,59 @@ public class MainActivity extends AppCompatActivity {
         return bearerToken;
     }
 
-    public String getSearchTweets(String bearerToken, String value)
-    {
-        HttpURLConnection connection = null;
-        StringBuilder response = new StringBuilder();
-        try {
-            URL url = new URL("https://api.twitter.com/1.1/search/tweets.json?q=" + Uri.encode(value) + "&count=100");
-            connection = (HttpURLConnection)url.openConnection();
-            connection.setRequestMethod("GET");
+    public String getSearchTweets(String bearerToken, String value) {
+            HttpURLConnection connection = null;
+            StringBuilder response = new StringBuilder();
+            try {
+                URL url = new URL("https://api.twitter.com/1.1/search/tweets.json?q=" + Uri.encode(value) + "&result_type=recent&count=100");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
 
-            connection.setRequestProperty("Authorization", "Bearer " + bearerToken);
+                connection.setRequestProperty("Authorization", "Bearer " + bearerToken);
 
-            int responseCode = connection.getResponseCode();
-            if(responseCode == HttpURLConnection.HTTP_OK)
-            {
-                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String line = in.readLine();
-                while(line != null)
-                {
-                    response.append(line);
-                    line = in.readLine();
+                int responseCode = connection.getResponseCode();
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                    String line = in.readLine();
+                    while (line != null) {
+                        response.append(line);
+                        line = in.readLine();
+                    }
+
+                    JSONObject jsonObject = new JSONObject(response.toString());
+                    JSONArray results = jsonObject.getJSONArray("statuses");
+                    JSONObject object;
+                    ArrayList<String> strings = new ArrayList<>();
+                    int arrayLength = results.length();
+                    for (int i = 0; i < arrayLength; i++) {
+                        object = results.getJSONObject(i);
+                        strings.add(object.getString("text"));
+                        if (i == arrayLength - 1) {
+                            String[] myArray = strings.toArray(new String[strings.size()]);
+                            sendGetRequest(myArray, arrayLength, true);
+                            strings.clear();
+                        } else {
+                            if (strings.size() == 10) {
+                                String[] myArray = strings.toArray(new String[strings.size()]);
+                                sendGetRequest(myArray, arrayLength, false);
+                                strings.clear();
+                            }
+                        }
+                    }
+                    Log.i("TimePass", String.valueOf(response.toString()));
+                    in.close();
+                } else {
+                    System.out.println(connection.getResponseMessage());
                 }
-
-                JSONObject jsonObject = new JSONObject(response.toString());
-                JSONArray results = jsonObject.getJSONArray("statuses");
-                JSONObject object;
-                int arrayLength = results.length();
-                for (int i = 0; i < arrayLength; i++) {
-                    object = results.getJSONObject(i);
-                    if (i == arrayLength - 1)
-                        sendGetRequest(object.getString("text"), arrayLength, true);
-                    else
-                        sendGetRequest(object.getString("text"), arrayLength, false);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
                 }
-                Log.i("TimePass", String.valueOf(response.toString()));
-                in.close();
             }
-            else {
-                System.out.println(connection.getResponseMessage());
-            }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-        finally {
-            if(connection != null) {
-                connection.disconnect();
-            }
-        }
-        return response.toString();
+                return response.toString();
     }
 
     @Override
@@ -174,13 +180,35 @@ public class MainActivity extends AppCompatActivity {
         MenuItem searchItem = menu.findItem(R.id.action_search);
         final SearchView searchView = (SearchView) searchItem.getActionView();
         SearchManager searchManager = (SearchManager) getSystemService(Context.SEARCH_SERVICE);
-        // Assumes current activity is the searchable activity
-        ComponentName cn = new ComponentName(this, SearchableActivity.class);
+        ComponentName cn = new ComponentName(this, MainActivity.class);
         searchView.setSearchableInfo(searchManager.getSearchableInfo(cn));
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
-            public boolean onQueryTextSubmit(String s) {
-                return false;
+            public boolean onQueryTextSubmit(final String tweet) {
+                if (progressBar.getVisibility() != View.VISIBLE) {
+                    progressBar.setVisibility(View.VISIBLE);
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (bearerToken == null) {
+                                String authorizationHeader = getAuthorizationHeader("FOQIQnJENhEgjYXYaGSIhhSaA", "9B2nTfoFFPeysRhegLm9Yra4r5psBBOAPMqOtqq7T2U27Cxqwr");
+                                bearerToken = postOAuth2Token(authorizationHeader);
+                            }
+                            finalScore = 0d;
+                            threads.clear();
+                            getSearchTweets(bearerToken, tweet);
+
+                        }
+                    }).start();
+                } else {
+                    Toast.makeText(MainActivity.this, "Another Search in Progress...", Toast.LENGTH_SHORT).show();
+                }
+                View view = MainActivity.this.getCurrentFocus();
+                if (view != null) {
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                }
+                return true;
             }
 
             @Override
@@ -210,63 +238,108 @@ public class MainActivity extends AppCompatActivity {
         return super.onPrepareOptionsMenu(menu);
     }
 
-    private void sendGetRequest(final String text, final int arrayLength, final boolean lastTweet) {
-        new Thread(new Runnable() {
+    @Override
+    public void setIntent(Intent newIntent) {
+
+    }
+//
+//    class Work extends AsyncTask<String, Void, Void> {
+//
+//        private int arrayLength;
+//        private boolean lastTweet;
+//
+//        public Work(int arrayLength, boolean lastTweet) {
+//            this.arrayLength = arrayLength;
+//            this.lastTweet = lastTweet;
+//        }
+//
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+//
+//        @Override
+//        protected Void doInBackground(String... params) {
+//            sendGetRequest(params[0], arrayLength, lastTweet);
+//            return null;
+//        }
+//
+//        @Override
+//        protected void onPostExecute(Void aVoid) {
+//            super.onPostExecute(aVoid);
+//            if (lastTweet) {
+//                Log.i("FinalScore", String.valueOf(finalScore / arrayLength));
+//                float ans= (float) ((finalScore / arrayLength) * 100);
+//                DecimalFormat df = new DecimalFormat("#.####");
+//                textView.setText("Final score : " + df.format(ans) + "%");
+//            }
+//        }
+//    }
+
+    private void sendGetRequest(final String tweets[], final int arrayLength, final boolean lastTweet) {
+        Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    URL sent = new URL(url);
-                    HttpURLConnection connection = (HttpURLConnection) sent.openConnection();
-                    connection.setRequestMethod("POST");
+                    for (String text : tweets) {
+                        URL sent = new URL(url);
+                        HttpURLConnection connection = (HttpURLConnection) sent.openConnection();
+                        connection.setRequestMethod("POST");
 
-                    Uri.Builder builder = new Uri.Builder()
-                            .appendQueryParameter("apikey", key)
-                            .appendQueryParameter("text", text);
-                    String query = builder.build().getEncodedQuery();
+                        Uri.Builder builder = new Uri.Builder()
+                                .appendQueryParameter("apikey", key)
+                                .appendQueryParameter("text", text);
+                        String query = builder.build().getEncodedQuery();
 
-                    OutputStream os = connection.getOutputStream();
-                    BufferedWriter writer = new BufferedWriter(
-                            new OutputStreamWriter(os, "UTF-8"));
-                    writer.write(query);
-                    writer.flush();
-                    try {
-                        writer.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    os.close();
-                    connection.connect();
-                    if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                        BufferedReader reader1 = new BufferedReader(
-                                new InputStreamReader(connection.getInputStream()));
-
-                        StringBuilder result1 = new StringBuilder();
-                        String line1;
-                        while ((line1 = reader1.readLine()) != null) {
-                            result1.append(line1);
+                        OutputStream os = connection.getOutputStream();
+                        BufferedWriter writer = new BufferedWriter(
+                                new OutputStreamWriter(os, "UTF-8"));
+                        writer.write(query);
+                        writer.flush();
+                        try {
+                            writer.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
-                        JSONObject jsonObject = new JSONObject(result1.toString());
-                        JSONObject aggregate = jsonObject.getJSONObject("aggregate");
-                        Gson gson = new Gson();
-                        Log.i("TimePass", "Tweet: " + text + "Result: " + aggregate.toString() + "\n");
-                        GsonResult res = gson.fromJson(aggregate.toString(), GsonResult.class);
-                        finalScore += res.score;
-                    } else {
-                        System.out.println(connection.getResponseCode());
+                        os.close();
+                        connection.connect();
+                        if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                            BufferedReader reader1 = new BufferedReader(
+                                    new InputStreamReader(connection.getInputStream()));
+
+                            StringBuilder result1 = new StringBuilder();
+                            String line1;
+                            while ((line1 = reader1.readLine()) != null) {
+                                result1.append(line1);
+                            }
+                            JSONObject jsonObject = new JSONObject(result1.toString());
+                            JSONObject aggregate = jsonObject.getJSONObject("aggregate");
+                            Gson gson = new Gson();
+                            Log.i("TimePass", "Tweet: " + text + "Result: " + aggregate.toString() + "\n");
+                            GsonResult res = gson.fromJson(aggregate.toString(), GsonResult.class);
+                            finalScore += res.score;
+                        } else {
+                            System.out.println(connection.getResponseCode());
+                        }
                     }
-                } catch(Exception e) {
+                }catch(Exception e){
                     e.printStackTrace();
                 }
                 if (lastTweet) {
-                    Log.i("FinalScore", String.valueOf(finalScore / arrayLength));
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            textView.setText("Final score : "+String.valueOf((finalScore / arrayLength)*100)+"%");
+                            Log.i("FinalScore", String.valueOf(finalScore / arrayLength));
+                            float ans = (float) ((finalScore / arrayLength) * 100);
+                            DecimalFormat df = new DecimalFormat("#.####");
+                            textView.setText("Final score : " + df.format(ans) + "%");
+                            progressBar.setVisibility(View.GONE);
                         }
                     });
                 }
             }
-        }).start();
+        });
+        threads.add(thread);
+        thread.start();
     }
 }
