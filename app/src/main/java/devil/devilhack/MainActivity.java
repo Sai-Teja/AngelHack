@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.widget.TextView;
 
 import com.google.gson.Gson;
 
@@ -34,12 +35,13 @@ public class MainActivity extends AppCompatActivity {
     String key = "b661aa39-4ce2-4fba-9087-2a9fde68c8b1";
     String url = "https://api.havenondemand.com/1/api/sync/analyzesentiment/v1";
     Double finalScore = 0d;
-
+    TextView textView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        textView=(TextView)findViewById(R.id.tv) ;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -257,6 +259,12 @@ public class MainActivity extends AppCompatActivity {
                 }
                 if (lastTweet) {
                     Log.i("FinalScore", String.valueOf(finalScore / arrayLength));
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            textView.setText("Final score : "+String.valueOf((finalScore / arrayLength)*100)+"%");
+                        }
+                    });
                 }
             }
         }).start();
