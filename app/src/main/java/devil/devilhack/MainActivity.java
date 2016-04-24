@@ -33,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
 
     String key = "b661aa39-4ce2-4fba-9087-2a9fde68c8b1";
     String url = "https://api.havenondemand.com/1/api/sync/analyzesentiment/v1";
+    Double finalScore = 0d;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -136,9 +137,13 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject jsonObject = new JSONObject(response.toString());
                 JSONArray results = jsonObject.getJSONArray("statuses");
                 JSONObject object;
-                for (int i = 0; i < 100; i++) {
+                int arrayLength = results.length();
+                for (int i = 0; i < arrayLength; i++) {
                     object = results.getJSONObject(i);
-                    sendGetRequest(object.getString("text"));
+                    if (i == arrayLength - 1)
+                        sendGetRequest(object.getString("text"), arrayLength, true);
+                    else
+                        sendGetRequest(object.getString("text"), arrayLength, false);
                 }
                 Log.i("TimePass", String.valueOf(response.toString()));
                 in.close();
@@ -203,7 +208,7 @@ public class MainActivity extends AppCompatActivity {
         return super.onPrepareOptionsMenu(menu);
     }
 
-    private void sendGetRequest(final String text) {
+    private void sendGetRequest(final String text, final int arrayLength, final boolean lastTweet) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -243,11 +248,15 @@ public class MainActivity extends AppCompatActivity {
                         Gson gson = new Gson();
                         Log.i("TimePass", "Tweet: " + text + "Result: " + aggregate.toString() + "\n");
                         GsonResult res = gson.fromJson(aggregate.toString(), GsonResult.class);
+                        finalScore += res.score;
                     } else {
                         System.out.println(connection.getResponseCode());
                     }
                 } catch(Exception e) {
                     e.printStackTrace();
+                }
+                if (lastTweet) {
+                    Log.i("FinalScore", String.valueOf(finalScore / arrayLength));
                 }
             }
         }).start();
