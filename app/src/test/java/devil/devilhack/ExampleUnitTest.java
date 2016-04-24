@@ -1,4 +1,4 @@
-package devil.devilhack;
+package devil.angelhack;
 
 import org.junit.Test;
 
